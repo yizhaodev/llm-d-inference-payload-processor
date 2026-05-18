@@ -18,14 +18,23 @@ package modelselector
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
+	"github.com/llm-d/llm-d-inference-payload-processor/pkg/datastore"
 	"github.com/llm-d/llm-d-inference-payload-processor/pkg/framework"
 )
 
+func newTestDatastore(modelNames ...string) datastore.Datastore {
+	ds := datastore.NewStore()
+	for _, name := range modelNames {
+		ds.GetOrCreateModel(name)
+	}
+	return ds
+}
+
 func TestProcessRequestWritesSelectedModelToBodyAndCycleState(t *testing.T) {
-	plugin, err := NewModelSelectorPlugin([]string{"model-a", "model-b", "model-c"})
+	ds := newTestDatastore("model-a", "model-b", "model-c")
+	plugin, err := NewModelSelectorPlugin(ds)
 	if err != nil {
 		t.Fatalf("failed to create plugin: %v", err)
 	}
@@ -56,9 +65,10 @@ func TestProcessRequestWritesSelectedModelToBodyAndCycleState(t *testing.T) {
 	}
 }
 
-func TestProcessRequestSelectsFromConfiguredCandidates(t *testing.T) {
+func TestProcessRequestSelectsFromDatastoreModels(t *testing.T) {
 	candidates := []string{"llama-70b", "llama-8b", "mistral-7b"}
-	plugin, err := NewModelSelectorPlugin(candidates)
+	ds := newTestDatastore(candidates...)
+	plugin, err := NewModelSelectorPlugin(ds)
 	if err != nil {
 		t.Fatalf("failed to create plugin: %v", err)
 	}
@@ -81,57 +91,37 @@ func TestProcessRequestSelectsFromConfiguredCandidates(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("selected model %q is not in candidate list %v", selectedModel, candidates)
+		t.Errorf("selected model %q is not in datastore models %v", selectedModel, candidates)
 	}
 }
 
-func TestNewModelSelectorPluginRejectsEmptyCandidates(t *testing.T) {
-	_, err := NewModelSelectorPlugin([]string{})
-	if err == nil {
-		t.Fatal("expected error for empty candidates")
-	}
-}
-
-func TestFactoryParsesCandidatesFromConfig(t *testing.T) {
-	config := ModelSelectorPluginConfig{
-		Candidates: []string{"model-a", "model-b"},
-	}
-	rawParams, _ := json.Marshal(config)
-
-	plugin, err := ModelSelectorPluginFactory("test-selector", rawParams, nil)
+func TestProcessRequestFailsWithEmptyDatastore(t *testing.T) {
+	ds := newTestDatastore() // no models
+	plugin, err := NewModelSelectorPlugin(ds)
 	if err != nil {
-		t.Fatalf("factory failed: %v", err)
+		t.Fatalf("failed to create plugin: %v", err)
 	}
 
-	if plugin.TypedName().Name != "test-selector" {
-		t.Errorf("expected name 'test-selector', got %q", plugin.TypedName().Name)
-	}
-	if plugin.TypedName().Type != ModelSelectorPluginType {
-		t.Errorf("expected type %q, got %q", ModelSelectorPluginType, plugin.TypedName().Type)
+	request := framework.NewInferenceRequest()
+	request.Body["model"] = "auto"
+	cycleState := framework.NewCycleState()
+
+	err = plugin.ProcessRequest(context.Background(), cycleState, request)
+	if err == nil {
+		t.Fatal("expected error with empty datastore")
 	}
 }
 
-func TestFactoryRejectsEmptyCandidates(t *testing.T) {
-	config := ModelSelectorPluginConfig{
-		Candidates: []string{},
-	}
-	rawParams, _ := json.Marshal(config)
-
-	_, err := ModelSelectorPluginFactory("test-selector", rawParams, nil)
+func TestNewModelSelectorPluginRejectsNilDatastore(t *testing.T) {
+	_, err := NewModelSelectorPlugin(nil)
 	if err == nil {
-		t.Fatal("expected error for empty candidates in factory")
-	}
-}
-
-func TestFactoryRejectsInvalidJSON(t *testing.T) {
-	_, err := ModelSelectorPluginFactory("test-selector", json.RawMessage(`{invalid`), nil)
-	if err == nil {
-		t.Fatal("expected error for invalid JSON")
+		t.Fatal("expected error for nil datastore")
 	}
 }
 
 func TestTypedName(t *testing.T) {
-	plugin, _ := NewModelSelectorPlugin([]string{"model-a"})
+	ds := newTestDatastore("model-a")
+	plugin, _ := NewModelSelectorPlugin(ds)
 	if plugin.TypedName().Type != ModelSelectorPluginType {
 		t.Errorf("expected type %q, got %q", ModelSelectorPluginType, plugin.TypedName().Type)
 	}
