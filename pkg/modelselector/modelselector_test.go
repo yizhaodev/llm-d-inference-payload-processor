@@ -70,9 +70,10 @@ func TestSelect(t *testing.T) {
 			}
 			picker := &testPicker{typedName: plugin.TypedName{Type: "test-picker", Name: "max-score"}}
 
-			pipeline := NewModelSelectorPipeline().
-				WithScorers(NewWeightedScorer(scorer, 1.0)).
-				WithPicker(picker)
+			pipeline := NewModelSelectorPipeline().WithPicker(picker)
+			if err := pipeline.AddPlugins(NewWeightedScorer(scorer, 1.0)); err != nil {
+				t.Fatalf("AddPlugins failed: %v", err)
+			}
 
 			selector := NewModelSelector(pipeline)
 
@@ -133,10 +134,10 @@ func TestSelectWithFilterAndScorer(t *testing.T) {
 
 	picker := &testPicker{typedName: plugin.TypedName{Type: "test-picker", Name: "max-score"}}
 
-	pipeline := NewModelSelectorPipeline().
-		WithFilters(filter).
-		WithScorers(NewWeightedScorer(scorer, 1.0)).
-		WithPicker(picker)
+	pipeline := NewModelSelectorPipeline().WithPicker(picker)
+	if err := pipeline.AddPlugins(filter, NewWeightedScorer(scorer, 1.0)); err != nil {
+		t.Fatalf("AddPlugins failed: %v", err)
+	}
 
 	selector := NewModelSelector(pipeline)
 

@@ -171,10 +171,14 @@ func TestPipelineRun(t *testing.T) {
 			pipeline := NewModelSelectorPipeline().WithPicker(picker)
 
 			if tt.filter != nil {
-				pipeline.WithFilters(tt.filter)
+				if err := pipeline.AddPlugins(tt.filter); err != nil {
+					t.Fatalf("AddPlugins(filter) failed: %v", err)
+				}
 			}
 			if tt.scorer != nil {
-				pipeline.WithScorers(NewWeightedScorer(tt.scorer, 1.0))
+				if err := pipeline.AddPlugins(NewWeightedScorer(tt.scorer, 1.0)); err != nil {
+					t.Fatalf("AddPlugins(scorer) failed: %v", err)
+				}
 			}
 
 			result, err := pipeline.Run(context.Background(), requesthandling.NewInferenceRequest(), plugin.NewCycleState(), tt.models)
@@ -233,9 +237,10 @@ func TestScoreWeightAccumulation(t *testing.T) {
 
 	// cost weight=3, latency weight=1 → model-a should win (3*1.0 + 1*0.0 = 3.0 vs 3*0.0 + 1*1.0 = 1.0)
 	picker := &testPicker{typedName: plugin.TypedName{Type: "test-picker", Name: "max-score"}}
-	pipeline := NewModelSelectorPipeline().
-		WithScorers(NewWeightedScorer(scorer1, 3.0), NewWeightedScorer(scorer2, 1.0)).
-		WithPicker(picker)
+	pipeline := NewModelSelectorPipeline().WithPicker(picker)
+	if err := pipeline.AddPlugins(NewWeightedScorer(scorer1, 3.0), NewWeightedScorer(scorer2, 1.0)); err != nil {
+		t.Fatalf("AddPlugins failed: %v", err)
+	}
 
 	result, err := pipeline.Run(context.Background(), requesthandling.NewInferenceRequest(), plugin.NewCycleState(), []datalayer.Model{modelA, modelB})
 	if err != nil {

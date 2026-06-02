@@ -72,18 +72,6 @@ func (p *ModelSelectorPipeline) Picker() modelselector.Picker {
 	return p.picker
 }
 
-// WithFilters sets the given filter plugins as the Filter plugins.
-func (p *ModelSelectorPipeline) WithFilters(filters ...modelselector.Filter) *ModelSelectorPipeline {
-	p.filters = filters
-	return p
-}
-
-// WithScorers sets the given scorer plugins as the Scorer plugins.
-func (p *ModelSelectorPipeline) WithScorers(scorers ...*WeightedScorer) *ModelSelectorPipeline {
-	p.scorers = scorers
-	return p
-}
-
 // WithPicker sets the given picker plugin as the Picker plugin.
 func (p *ModelSelectorPipeline) WithPicker(picker modelselector.Picker) *ModelSelectorPipeline {
 	p.picker = picker

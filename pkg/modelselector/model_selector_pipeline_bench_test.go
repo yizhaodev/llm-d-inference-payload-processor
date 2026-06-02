@@ -63,13 +63,14 @@ func BenchmarkModelSelectorPipelineRun(b *testing.B) {
 		typedName: plugin.TypedName{Type: "bench-picker", Name: "max-score"},
 	}
 
-	pipeline := NewModelSelectorPipeline().
-		WithScorers(
-			NewWeightedScorer(scorer1, 1.0),
-			NewWeightedScorer(scorer2, 1.0),
-			NewWeightedScorer(scorer3, 1.0),
-		).
-		WithPicker(picker)
+	pipeline := NewModelSelectorPipeline().WithPicker(picker)
+	if err := pipeline.AddPlugins(
+		NewWeightedScorer(scorer1, 1.0),
+		NewWeightedScorer(scorer2, 1.0),
+		NewWeightedScorer(scorer3, 1.0),
+	); err != nil {
+		b.Fatalf("AddPlugins failed: %v", err)
+	}
 
 	request := requesthandling.NewInferenceRequest()
 
